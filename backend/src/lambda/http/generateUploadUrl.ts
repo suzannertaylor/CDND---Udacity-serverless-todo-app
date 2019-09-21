@@ -75,7 +75,7 @@ async function createImage(todoId: string, imageId: string, event: any) {
     timestamp,
     imageId,
     ...newImage,
-    imageUrl: `https://${bucketName}.s3.amazonaws.com/${imageId}`
+    attachmentUrl: `https://${bucketName}.s3.amazonaws.com/${imageId}`
   }
   console.log('Storing new item: ', newItem)
 

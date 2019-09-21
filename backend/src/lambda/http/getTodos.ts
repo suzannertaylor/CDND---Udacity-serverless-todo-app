@@ -4,10 +4,12 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult, APIGatewayProxyHandler } f
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
 import { parseUserId } from '../../auth/utils'
 
+
 const docClient = new DocumentClient()
 
 const todosTable = process.env.TODOS_TABLE
 const userIdIndex = process.env.TODO_USER_ID_INDEX
+const imagesTable = process.env.IMAGES_TABLE
 
 export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   console.log('Processing event:', event)
@@ -26,12 +28,27 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
   }).promise()
 
   if (result.Count !== 0) {
+    const res = result.Items
+    console.log(res)
+    const items = await Promise.all(res.map(async item => {
+      console.log(item)
+      let images = await getImagesPerTodo(item.todoId)
+      console.log('images', images)
+      if (images) {
+        const attachmentUrl = images[0].attachmentUrl ? images[0].attachmentUrl : (images[0].imageUrl ? images[0].imageUrl : null)
+        if (attachmentUrl) {
+          item.attachmentUrl= attachmentUrl
+        }
+      }
+      return item
+    }))
+
     return {
       statusCode: 200,
       headers: {
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify({items: result.Items})
+      body: JSON.stringify({items: items})
     }
   }
 
@@ -43,4 +60,21 @@ export const handler: APIGatewayProxyHandler = async (event: APIGatewayProxyEven
     body: JSON.stringify({items: []})
   }
 
+}
+
+async function getImagesPerTodo(todoId: string) {
+  const result = await docClient.query({
+    TableName: imagesTable,
+    KeyConditionExpression: 'todoId = :todoId',
+    ExpressionAttributeValues: {
+      ':todoId': todoId
+    },
+    ScanIndexForward: false
+  }).promise()
+
+  if(result.Count !== 0) {
+    return result.Items
+  }
+
+  return false
 }
